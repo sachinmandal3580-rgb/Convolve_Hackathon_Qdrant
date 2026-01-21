@@ -1,6 +1,30 @@
-# .gitignore
+# Environment variables
 .env
-*.pyc
+.env.local
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Qdrant storage
 qdrant_storage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
 .cache/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

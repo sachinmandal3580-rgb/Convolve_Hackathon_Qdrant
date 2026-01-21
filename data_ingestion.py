@@ -1,3 +1,7 @@
+"""
+Data Ingestion Pipeline - Handles adding data to Qdrant
+"""
+
 import json
 from datetime import datetime
 from embeddings import EmbeddingGenerator
@@ -5,20 +9,34 @@ from qdrant_manager import HealthcareQdrantManager
 
 class DataIngestionPipeline:
     def __init__(self, qdrant_manager):
+        """
+        Initialize ingestion pipeline
+        
+        Args:
+            qdrant_manager: HealthcareQdrantManager instance
+        """
         self.qm = qdrant_manager
         self.embedder = EmbeddingGenerator()
     
     def ingest_patient_report(self, patient_id, report_data):
         """
-        report_data = {
-            "text": "Patient presents with...",
-            "report_type": "consultation",
-            "doctor": "Dr. Smith",
-            "diagnosis": "Type 2 Diabetes",
-            "medications": ["Metformin", "Insulin"]
-        }
+        Ingest a patient report
+        
+        Args:
+            patient_id: Patient identifier (e.g., "P001")
+            report_data: Dict containing report information
+                {
+                    "text": "Report text...",
+                    "report_type": "consultation",
+                    "doctor": "Dr. Smith",
+                    "diagnosis": "...",
+                    "medications": [...]
+                }
+        
+        Returns:
+            Point ID of the ingested record
         """
-        # Generate embedding
+        # Generate embedding from text
         embedding = self.embedder.encode_text(report_data["text"])
         
         # Add to Qdrant
@@ -27,24 +45,32 @@ class DataIngestionPipeline:
             report_text=report_data["text"],
             embedding=embedding,
             metadata={
-                "report_type": report_data.get("report_type"),
-                "doctor": report_data.get("doctor"),
-                "diagnosis": report_data.get("diagnosis"),
+                "report_type": report_data.get("report_type", "general"),
+                "doctor": report_data.get("doctor", "unknown"),
+                "diagnosis": report_data.get("diagnosis", ""),
                 "medications": report_data.get("medications", [])
             }
         )
         
-        print(f"Ingested report: {point_id}")
+        print(f"✓ Ingested report: {point_id[:8]}...")
         return point_id
     
     def ingest_medical_image(self, patient_id, image_data):
         """
-        image_data = {
-            "path": "path/to/xray.jpg",
-            "modality": "X-ray",
-            "body_part": "chest",
-            "findings": "No acute findings"
-        }
+        Ingest a medical image
+        
+        Args:
+            patient_id: Patient identifier
+            image_data: Dict containing image information
+                {
+                    "path": "path/to/image.jpg",
+                    "modality": "X-ray",
+                    "body_part": "chest",
+                    "findings": "..."
+                }
+        
+        Returns:
+            Point ID of the ingested record
         """
         # Generate image embedding
         embedding = self.embedder.encode_image(image_data["path"])
@@ -55,38 +81,40 @@ class DataIngestionPipeline:
             image_path=image_data["path"],
             embedding=embedding,
             metadata={
-                "modality": image_data.get("modality"),
-                "body_part": image_data.get("body_part"),
-                "findings": image_data.get("findings")
+                "modality": image_data.get("modality", "unknown"),
+                "body_part": image_data.get("body_part", ""),
+                "findings": image_data.get("findings", "")
             }
         )
         
-        print(f"Ingested image: {point_id}")
+        print(f"✓ Ingested image: {point_id[:8]}...")
         return point_id
     
     def batch_ingest(self, patient_id, data_file):
-        """Batch ingest from JSON file"""
+        """
+        Batch ingest from JSON file
+        
+        Args:
+            patient_id: Patient identifier
+            data_file: Path to JSON file with structure:
+                {
+                    "reports": [...],
+                    "images": [...]
+                }
+        """
         with open(data_file, 'r') as f:
             data = json.load(f)
         
-        for report in data.get("reports", []):
+        print(f"Batch ingesting data for patient {patient_id}...")
+        
+        # Ingest reports
+        for i, report in enumerate(data.get("reports", []), 1):
+            print(f"  Report {i}/{len(data.get('reports', []))}...", end=" ")
             self.ingest_patient_report(patient_id, report)
         
-        for image in data.get("images", []):
+        # Ingest images
+        for i, image in enumerate(data.get("images", []), 1):
+            print(f"  Image {i}/{len(data.get('images', []))}...", end=" ")
             self.ingest_medical_image(patient_id, image)
-
-# Example usage
-if __name__ == "__main__":
-    qm = HealthcareQdrantManager()
-    pipeline = DataIngestionPipeline(qm)
-    
-    # Sample report
-    report = {
-        "text": "Patient presents with persistent cough and fever.",
-        "report_type": "consultation",
-        "doctor": "Dr. Sarah Johnson",
-        "diagnosis": "Upper Respiratory Infection",
-        "medications": ["Amoxicillin", "Cough syrup"]
-    }
-    
-    pipeline.ingest_patient_report("P001", report)
+        
+        print(f"✓ Batch ingestion complete!")
