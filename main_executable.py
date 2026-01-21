@@ -26,7 +26,7 @@ class HealthcareMemoryAssistant:
         self.retrieval = HealthcareRetrieval(self.qm)
         
         print("=" * 70)
-        print("✓ System ready!\n")
+        print("System ready!\n")
     
     def add_consultation(self, patient_id, consultation_data):
         """Add a patient consultation record"""
@@ -163,7 +163,7 @@ def demo():
         print("\n" + "=" * 70)
         print("DEMO COMPLETE")
         print("=" * 70)
-        print("\n✅ Successfully demonstrated:")
+        print("\nSuccessfully demonstrated:")
         print("  • Multimodal data ingestion (text reports)")
         print("  • Semantic vector search")
         print("  • Temporal filtering")
@@ -172,7 +172,7 @@ def demo():
         print("\nThe system is ready for production use!")
         
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
         print("\nTroubleshooting:")

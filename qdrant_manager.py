@@ -1,5 +1,5 @@
 """
-Qdrant Manager - Handles all database operations
+Qdrant Manager 
 """
 
 from qdrant_client import QdrantClient
@@ -17,26 +17,27 @@ import uuid
 from datetime import datetime
 
 class HealthcareQdrantManager:
-    def __init__(self, url='https://13a8ecee-942e-4041-896f-5665b4923c13.europe-west3-0.gcp.cloud.qdrant.io', api_key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.CTY7BW_2os8hoZyG2TEltYiq1YyU6BGX5KxvxxlK1xE'):
+    def __init__(self, url='https://13a8ecee-942e-4041-896f-5665b4923c13.europe-west3-0.gcp.cloud.qdrant.io',
+                 api_key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.CTY7BW_2os8hoZyG2TEltYiq1YyU6BGX5KxvxxlK1xE'):
         """Initialize Qdrant client and setup collections"""
-        if api_key:
-            self.client = QdrantClient(
-                url=url,
-                api_key=api_key,
-                timeout=60
-            )
-            print(f"✓ Connected to Qdrant Cloud: {url}")
-        else:
-            self.client = QdrantClient(url=url)
-            print(f"✓ Connected to local Qdrant: {url}")
+        
+        self.client = QdrantClient(
+            url=url,
+            api_key=api_key,
+            timeout=60
+        )
+        print(f"Connected to Qdrant Cloud: {url}")
+        # else:
+        #     self.client = QdrantClient(url=url)
+        #     print(f"Connected to local Qdrant: {url}")
         
         self.setup_collections()
     
     def setup_collections(self):
         """Create collections with proper vector configurations"""
         collections = {
-            "patient_reports": 768,  # Text embeddings (sentence-transformers)
-            "medical_images": 512,   # Image embeddings (CLIP)
+            "patient_reports": 768,  # Text embeddings (sentence-transformers-->all-mpnet-base-v2)
+            "medical_images": 512,   # Image embeddings (CLIP-->clip-vit-base-patch32)
             "patient_timeline": 768  # Temporal events
         }
         
@@ -50,20 +51,20 @@ class HealthcareQdrantManager:
                             distance=Distance.COSINE
                         )
                     )
-                    print(f"✓ Created collection: {name}")
+                    print(f"Created collection: {name}")
                 else:
-                    print(f"✓ Collection exists: {name}")
+                    print(f"Collection exists: {name}")
                 
                 # Create indexes for filtering
                 self.create_indexes(name)
                     
             except Exception as e:
-                print(f"❌ Error with collection {name}: {e}")
+                print(f"Error with collection {name}: {e}")
                 raise
     
     def create_indexes(self, collection_name):
         """
-        Create payload indexes for efficient filtering
+        Payload indexes for efficient filtering
         CRITICAL: Required for filtering operations
         """
         indexes = [
@@ -81,12 +82,12 @@ class HealthcareQdrantManager:
                     field_name=field_name,
                     field_schema=field_type
                 )
-                print(f"  ✓ Index: {field_name}")
+                print(f"Index: {field_name}")
             except Exception as e:
                 if "already exists" in str(e).lower():
                     pass  # Index already exists, that's fine
                 else:
-                    print(f"  ⚠ Index warning for {field_name}: {str(e)[:50]}")
+                    print(f"Index warning for {field_name}: {str(e)[:50]}")
     
     def add_patient_report(self, patient_id, report_text, embedding, metadata):
         """Add a patient report to Qdrant"""

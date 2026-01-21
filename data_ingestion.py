@@ -52,7 +52,7 @@ class DataIngestionPipeline:
             }
         )
         
-        print(f"✓ Ingested report: {point_id[:8]}...")
+        print(f"Ingested report: {point_id[:8]}...")
         return point_id
     
     def ingest_medical_image(self, patient_id, image_data):
@@ -87,7 +87,7 @@ class DataIngestionPipeline:
             }
         )
         
-        print(f"✓ Ingested image: {point_id[:8]}...")
+        print(f"Ingested image: {point_id[:8]}...")
         return point_id
     
     def batch_ingest(self, patient_id, data_file):
@@ -117,4 +117,4 @@ class DataIngestionPipeline:
             print(f"  Image {i}/{len(data.get('images', []))}...", end=" ")
             self.ingest_medical_image(patient_id, image)
         
-        print(f"✓ Batch ingestion complete!")
+        print(f"Batch ingestion complete!")

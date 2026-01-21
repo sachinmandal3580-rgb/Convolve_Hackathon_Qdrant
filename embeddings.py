@@ -1,5 +1,5 @@
 """
-Embedding Generator - Converts text and images to vectors
+Embedding Generator - Converts text and images to vectors by creating small chunks/tokens
 """
 
 from sentence_transformers import SentenceTransformer
@@ -16,7 +16,7 @@ class EmbeddingGenerator:
         self.text_model = SentenceTransformer(
             'sentence-transformers/all-mpnet-base-v2'
         )
-        print("  ✓ Text model loaded")
+        print("Text model loaded")
         
         # Image embeddings - 512 dimensions
         self.image_model = CLIPModel.from_pretrained(
@@ -25,8 +25,8 @@ class EmbeddingGenerator:
         self.image_processor = CLIPProcessor.from_pretrained(
             "openai/clip-vit-base-patch32"
         )
-        print("  ✓ Image model loaded")
-        print("Models ready!\n")
+        print("Image model loaded")
+        print("Models are ready now!\n")
     
     def encode_text(self, text):
         """
