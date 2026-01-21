@@ -6,7 +6,7 @@ from datetime import datetime
 
 class HealthcareQdrantManager:
     def __init__(self, url="https://13a8ecee-942e-4041-896f-5665b4923c13.europe-west3-0.gcp.cloud.qdrant.io", api_key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.CTY7BW_2os8hoZyG2TEltYiq1YyU6BGX5KxvxxlK1xE'):
-        self.client = QdrantClient(url=url, api_key=api_key)
+        self.client = QdrantClient(url=url, api_key=api_key,timeout=60)
         self.setup_collections()
     
     def setup_collections(self):
@@ -94,10 +94,16 @@ class HealthcareQdrantManager:
                     )
                 )
         
-        results = self.client.search(
+        # results = self.client.search(
+        #     collection_name="patient_reports",
+        #     query_vector=query_vector,
+        #     query_filter=search_filter,
+        #     limit=limit
+        # )
+        results = self.client.query_points(
             collection_name="patient_reports",
-            query_vector=query_vector,
+            query=query_vector,  # Note: 'query' not 'query_vector'
             query_filter=search_filter,
             limit=limit
         )
-        return results
+        return results.points  # Note: access .points property
