@@ -27,10 +27,6 @@ class HealthcareQdrantManager:
             timeout=60
         )
         print(f"Connected to Qdrant Cloud: {url}")
-        # else:
-        #     self.client = QdrantClient(url=url)
-        #     print(f"Connected to local Qdrant: {url}")
-        
         self.setup_collections()
     
     def setup_collections(self):
