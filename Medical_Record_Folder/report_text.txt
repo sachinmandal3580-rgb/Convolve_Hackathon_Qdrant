@@ -1,0 +1,4 @@
+Patient John Doe presents with chest pain.
+Diagnosis: Acute Myocardial Infarction
+Doctor: Dr. Sarah Smith
+Medications: Aspirin, Nitrogl

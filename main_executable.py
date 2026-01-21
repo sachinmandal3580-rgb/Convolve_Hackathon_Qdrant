@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from qdrant_manager import HealthcareQdrantManager
 from data_ingestion import DataIngestionPipeline
 from query_retrieval import HealthcareRetrieval
+from document_processor import DocumentProcessor
+from interactive_CLI import InteractiveCLI
 
 # Load environment variables
 load_dotenv()
@@ -109,6 +111,7 @@ def demo():
         for i, consult in enumerate(sample_consultations, 1):
             print(f"\n{i}. Adding {consult['report_type']} record...")
             assistant.add_consultation("P001", consult)
+        
         
         # ===== QUERY PATIENT HISTORY =====
         print("\n" + "=" * 70)
