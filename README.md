@@ -34,6 +34,7 @@ run in your terminal --> git clone <given_git_repository_link>
 Install required dependencies to run Agent on your env
 
 run in your terminal --> pip install -r requirements.txt
+Also add some more dependencies --> pip install pytesseract opencv-python
 
 Setup Qdrant using Qdrant Cloud (Recommended for Production)
 
