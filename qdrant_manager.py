@@ -1,7 +1,7 @@
 """
 Qdrant Manager 
 """
-
+import os
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, 
@@ -15,12 +15,15 @@ from qdrant_client.models import (
 )
 import uuid
 from datetime import datetime
+from dotenv import load_dotenv
 
 class HealthcareQdrantManager:
-    def __init__(self, url='https://13a8ecee-942e-4041-896f-5665b4923c13.europe-west3-0.gcp.cloud.qdrant.io',
-                 api_key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.CTY7BW_2os8hoZyG2TEltYiq1YyU6BGX5KxvxxlK1xE'):
+    def __init__(self, url, api_key):
+        
         """Initialize Qdrant client and setup collections"""
         
+        url=os.getenv("QDRANT_URL")
+        api_key=os.getenv("QDRANT_API_KEY")
         self.client = QdrantClient(
             url=url,
             api_key=api_key,

@@ -1,6 +1,5 @@
 """
 Quick Fix Script - Add Indexes to Existing Qdrant Collections
-Run this once to fix the "Index required" error
 """
 
 import os
@@ -14,7 +13,7 @@ def add_indexes_to_collections():
     """Add required indexes to all collections"""
     
     # Connect to Qdrant
-    url = os.getenv("QDRANT_URL", "http://localhost:6333")
+    url = os.getenv("QDRANT_URL")
     api_key = os.getenv("QDRANT_API_KEY")
     
     print("Connecting to Qdrant...")
