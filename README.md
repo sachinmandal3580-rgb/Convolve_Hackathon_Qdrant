@@ -47,6 +47,10 @@ Setup Qdrant using Qdrant Cloud (Recommended for Production)
     Copy and save the API key (you won't see it again!)
 
 Now, create .env file and use your credentials to use the Health Memory Assistant
+Inside .env :
+#Qdrant_Cloud_Configuration
+QDRANT_URL=<your Qdrant URL>
+QDRANT_API_KEY=<your created API key>
 
 📊 Agent Logic Overview
 1. Ingestion: The DocumentProcessor parses raw files into structured text or image paths.
