@@ -52,6 +52,9 @@ Inside .env :
 QDRANT_URL=<your Qdrant URL>
 QDRANT_API_KEY=<your created API key>
 
+Then, install tesseract OCR for better image procesing, using https://github.com/UB-Mannheim/tesseract/wiki
+and save into program files(by default don't change)
+
 NOTE:- Initial run may take some time to install and load some more dependencies.
 Then upload demo medical record folder file using batch folder upload option of interactive_CLI
 After that you can check patient history, timeline and other query using the CLI.

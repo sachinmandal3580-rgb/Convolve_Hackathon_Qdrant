@@ -1,5 +1,5 @@
 """
-Interactive CLI - Optimized for performance
+Interactive CLI 
 """
 
 import os
@@ -9,15 +9,13 @@ from dotenv import load_dotenv
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-from qdrant_manager import HealthcareQdrantManager
-from data_ingestion import DataIngestionPipeline
-from query_retrieval import HealthcareRetrieval
-from document_processor import DocumentProcessor
+# Import the new unified medical document processor
+from document_processor import MedicalDocumentProcessor
 
 load_dotenv()
 
 class InteractiveCLI:
-    """Interactive Command Line Interface with performance optimizations"""
+    """Interactive Command Line Interface with Medical Document Processor"""
     
     def __init__(self):
         """Initialize the system"""
@@ -25,19 +23,18 @@ class InteractiveCLI:
         print("🏥 HEALTHCARE MEMORY ASSISTANT - Interactive Mode")
         print("=" * 70)
         
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant_key = os.getenv("QDRANT_API_KEY")
-        
         print("\nInitializing system...")
-        self.qm = HealthcareQdrantManager(qdrant_url, qdrant_key)
-        self.ingestion = DataIngestionPipeline(self.qm)
-        self.retrieval = HealthcareRetrieval(self.qm)
-        self.doc_processor = DocumentProcessor()
+        
+        # Initialize the unified medical document processor
+        self.doc_processor = MedicalDocumentProcessor()
         
         # Timeout for processing operations (in seconds)
         self.processing_timeout = 30
         
-        print("System ready!\n")
+        print("✅ System ready!")
+        print(f"📄 Text formats: {', '.join(self.doc_processor.supported_text_formats)}")
+        print(f"🖼️  Image formats: {', '.join(self.doc_processor.supported_image_formats)}")
+        print()
     
     def display_menu(self):
         """Display main menu"""
@@ -97,15 +94,11 @@ class InteractiveCLI:
             print("❌ No text entered!")
             return
         
-        # Extract metadata with timeout
-        print("\nAnalyzing text...", end='', flush=True)
+        # Extract metadata
+        print("\n🔍 Analyzing text...", end='', flush=True)
         try:
             start_time = time.time()
-            metadata = self.process_with_timeout(
-                self.doc_processor.extract_medical_metadata, 
-                text,
-                timeout=10
-            )
+            metadata = self.doc_processor.extract_medical_metadata(text, fast_mode=True)
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
         except Exception as e:
@@ -113,7 +106,7 @@ class InteractiveCLI:
             print("Using default metadata...")
             metadata = {
                 'report_type': 'general',
-                'doctor': 'Unknown',
+                'doctor': None,
                 'diagnosis': None,
                 'medications': []
             }
@@ -121,17 +114,22 @@ class InteractiveCLI:
         # Show extracted info
         print("\n" + "-" * 70)
         print("✨ Extracted Information:")
-        print(f"   Report Type: {metadata.get('report_type', 'general')}")
-        print(f"   Doctor: {metadata.get('doctor', 'Unknown')}")
-        print(f"   Diagnosis: {metadata.get('diagnosis') or 'Not detected'}")
-        print(f"   Medications: {', '.join(metadata.get('medications', [])) if metadata.get('medications') else 'None detected'}")
+        print(f"   📋 Report Type: {metadata.get('report_type', 'general')}")
+        print(f"   👨‍⚕️ Doctor: {metadata.get('doctor') or 'Not detected'}")
+        print(f"   🩺 Diagnosis: {metadata.get('diagnosis') or 'Not detected'}")
+        print(f"   🏥 Department: {metadata.get('department') or 'Not detected'}")
+        print(f"   📅 Date: {metadata.get('report_date') or 'Not detected'}")
+        if metadata.get('medications'):
+            print(f"   💊 Medications: {', '.join(metadata['medications'])}")
+        else:
+            print(f"   💊 Medications: None detected")
         print("-" * 70)
         
         # Allow manual override
         print("\nWould you like to modify any information? (y/n): ", end='')
         if input().strip().lower() == 'y':
             metadata['report_type'] = input(f"Report Type [{metadata.get('report_type', 'general')}]: ").strip() or metadata.get('report_type', 'general')
-            metadata['doctor'] = input(f"Doctor [{metadata.get('doctor', 'Unknown')}]: ").strip() or metadata.get('doctor', 'Unknown')
+            metadata['doctor'] = input(f"Doctor [{metadata.get('doctor', '')}]: ").strip() or metadata.get('doctor')
             metadata['diagnosis'] = input(f"Diagnosis [{metadata.get('diagnosis', '')}]: ").strip() or metadata.get('diagnosis')
         
         # Confirm
@@ -140,25 +138,36 @@ class InteractiveCLI:
             print("❌ Cancelled")
             return
         
-        # Ingest
+        # Save using the document processor (which stores in database)
         try:
-            print("\nSaving report...", end='', flush=True)
+            print("\n💾 Saving report to database...", end='', flush=True)
             start_time = time.time()
-            report_data = {'text': text, **metadata}
-            point_id = self.process_with_timeout(
-                self.ingestion.ingest_patient_report,
-                patient_id,
-                report_data,
-                timeout=15
-            )
+            
+            # Create a temporary text file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+                f.write(text)
+                temp_path = f.name
+            
+            # Upload using document processor
+            result = self.doc_processor.upload_document(patient_id, temp_path)
+            
+            # Clean up temp file
+            os.remove(temp_path)
+            
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
-            print(f"\n✅ Successfully added report: {point_id[:8]}...")
+            
+            if result['success']:
+                print(f"\n✅ Report saved successfully! (ID: {result['document_id']})")
+            else:
+                print(f"\n❌ Error saving report: {result['error']}")
+                
         except Exception as e:
             print(f"\n❌ Error: {e}")
     
     def upload_document(self):
-        """Upload a document file with optimization"""
+        """Upload a document file"""
         print("\n" + "=" * 70)
         print("📄 UPLOAD DOCUMENT")
         print("=" * 70)
@@ -168,7 +177,7 @@ class InteractiveCLI:
             print("❌ Patient ID required!")
             return
         
-        file_path = input("Enter file path (PDF, DOCX, TXT): ").strip()
+        file_path = input("Enter file path (PDF, DOCX, TXT, JSON): ").strip()
         
         # Remove quotes if user added them
         file_path = file_path.strip('"').strip("'")
@@ -188,80 +197,34 @@ class InteractiveCLI:
         
         try:
             print(f"\n📖 Processing: {Path(file_path).name}")
-            print("Reading file...", end='', flush=True)
+            print("⏳ Uploading and processing document...", end='', flush=True)
             
             start_time = time.time()
-            # Process file with timeout (adjusted based on file size)
-            timeout = max(30, int(file_size * 5))  # 5 seconds per MB, min 30s
-            result = self.process_with_timeout(
-                self.doc_processor.process_file,
-                file_path,
-                timeout=timeout
-            )
+            result = self.doc_processor.upload_document(patient_id, file_path)
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
             
-            if result['type'] != 'text':
-                print("❌ Not a text document!")
+            if not result['success']:
+                print(f"\n❌ Error: {result['error']}")
                 return
             
-            text = result['text']
-            print(f"✓ Extracted {len(text)} characters from {result['metadata']['format'].upper()}")
-            
-            # Extract metadata with timeout
-            print("Analyzing content...", end='', flush=True)
-            start_time = time.time()
-            try:
-                metadata = self.process_with_timeout(
-                    self.doc_processor.extract_medical_metadata,
-                    text[:5000],  # Only analyze first 5000 chars for speed
-                    timeout=10
-                )
-                metadata.update(result['metadata'])
-                elapsed = time.time() - start_time
-                print(f" ✓ ({elapsed:.1f}s)")
-            except Exception as e:
-                print(f"\n⚠️  Warning: Metadata extraction timed out")
-                metadata = {
-                    'report_type': 'general',
-                    'doctor': 'Unknown',
-                    'diagnosis': None,
-                    'medications': []
-                }
-                metadata.update(result['metadata'])
-            
-            # Show preview
-            print("\n" + "-" * 70)
-            print("📄 Document Preview:")
-            preview = text[:400] + "..." if len(text) > 400 else text
-            print(preview)
-            print("\n" + "-" * 70)
-            print("✨ Extracted Information:")
-            print(f"   Report Type: {metadata.get('report_type', 'general')}")
-            print(f"   Doctor: {metadata.get('doctor', 'Unknown')}")
-            print(f"   Diagnosis: {metadata.get('diagnosis') or 'Not detected'}")
-            print(f"   Medications: {', '.join(metadata.get('medications', [])) or 'None'}")
-            print("-" * 70)
-            
-            # Confirm
-            print("\nAdd this document? (y/n): ", end='')
-            if input().strip().lower() != 'y':
-                print("❌ Cancelled")
-                return
-            
-            # Ingest
-            print("\nSaving document...", end='', flush=True)
-            start_time = time.time()
-            report_data = {'text': text, **metadata}
-            point_id = self.process_with_timeout(
-                self.ingestion.ingest_patient_report,
-                patient_id,
-                report_data,
-                timeout=20
-            )
-            elapsed = time.time() - start_time
-            print(f" ✓ ({elapsed:.1f}s)")
-            print(f"\n✅ Document added successfully: {point_id[:8]}...")
+            # Show results
+            print("\n" + "=" * 70)
+            print("✅ Document uploaded successfully!")
+            print("=" * 70)
+            print(f"📄 File Type: {result['file_type'].upper()} ({result['format'].upper()})")
+            print(f"📝 Extracted: {result['extracted_text_length']} characters")
+            print(f"🆔 Document ID: {result['document_id']}")
+            print("\n✨ Extracted Information:")
+            print(f"   📋 Report Type: {result['metadata']['report_type']}")
+            print(f"   👨‍⚕️ Doctor: {result['metadata']['doctor'] or 'Not detected'}")
+            print(f"   🩺 Diagnosis: {result['metadata']['diagnosis'] or 'Not detected'}")
+            print(f"   🏥 Department: {result['metadata']['department'] or 'Not detected'}")
+            print(f"   📅 Date: {result['metadata']['report_date'] or 'Not detected'}")
+            if result['metadata']['medications']:
+                print(f"   💊 Medications: {', '.join(result['metadata']['medications'])}")
+            print(f"   💾 Stored at: {result['storage_path']}")
+            print("=" * 70)
             
         except Exception as e:
             print(f"\n❌ Error: {e}")
@@ -269,7 +232,7 @@ class InteractiveCLI:
             traceback.print_exc()
     
     def add_image(self):
-        """Add medical image with optimization"""
+        """Add medical image with OCR"""
         print("\n" + "=" * 70)
         print("🖼️  ADD MEDICAL IMAGE")
         print("=" * 70)
@@ -296,58 +259,52 @@ class InteractiveCLI:
         
         try:
             print(f"\n🖼️  Processing: {Path(image_path).name}")
-            print("Reading image...", end='', flush=True)
+            print("⏳ Uploading and performing OCR...", end='', flush=True)
             
             start_time = time.time()
-            # Process with timeout (adjusted for image size)
-            timeout = max(30, int(file_size * 3))  # 3 seconds per MB
-            result = self.process_with_timeout(
-                self.doc_processor.process_file,
-                image_path,
-                timeout=timeout
-            )
+            result = self.doc_processor.upload_document(patient_id, image_path)
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
             
-            if result['type'] != 'image':
-                print("❌ Not a valid image file!")
+            if not result['success']:
+                print(f"\n❌ Error: {result['error']}")
                 return
             
-            print(f"✓ Valid {result['metadata']['format']} image")
-            if 'size' in result['metadata']:
-                print(f"  Size: {result['metadata']['size'][0]}x{result['metadata']['size'][1]} pixels")
+            # Show results
+            print("\n" + "=" * 70)
+            print("✅ Medical image uploaded successfully!")
+            print("=" * 70)
+            print(f"🖼️  File Type: {result['format'].upper()}")
+            print(f"📝 OCR Extracted: {result['extracted_text_length']} characters")
+            print(f"🆔 Document ID: {result['document_id']}")
+            print("\n✨ Extracted Information:")
+            print(f"   📋 Report Type: {result['metadata']['report_type']}")
+            print(f"   👨‍⚕️ Doctor: {result['metadata']['doctor'] or 'Not detected'}")
+            print(f"   🩺 Diagnosis: {result['metadata']['diagnosis'] or 'Not detected'}")
+            print(f"   🏥 Department: {result['metadata']['department'] or 'Not detected'}")
+            if result['metadata']['medications']:
+                print(f"   💊 Medications: {', '.join(result['metadata']['medications'])}")
+            print(f"   💾 Stored at: {result['storage_path']}")
             
-            # Get metadata
-            print("\n📝 Enter image details:")
-            modality = input("  Modality (X-ray/MRI/CT/Ultrasound/Other): ").strip() or "Unknown"
-            body_part = input("  Body part (chest/head/abdomen/etc.): ").strip() or "Unknown"
-            findings = input("  Findings/Notes: ").strip() or ""
+            # Show OCR preview if text was extracted
+            if result['extracted_text_length'] > 0:
+                print("\n📄 OCR Text Preview (first 300 characters):")
+                print("-" * 70)
+                # Get the extracted text from database
+                import sqlite3
+                conn = sqlite3.connect(self.doc_processor.db_path)
+                cursor = conn.cursor()
+                cursor.execute('SELECT extracted_text FROM medical_documents WHERE document_id = ?', 
+                             (result['document_id'],))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    preview = row[0][:300]
+                    print(preview + "..." if len(row[0]) > 300 else preview)
+                conn.close()
+            else:
+                print("\n⚠️  No text could be extracted from image (OCR found no readable text)")
             
-            # Confirm
-            print("\nAdd this image? (y/n): ", end='')
-            if input().strip().lower() != 'y':
-                print("❌ Cancelled")
-                return
-            
-            # Ingest
-            print("\nSaving image...", end='', flush=True)
-            start_time = time.time()
-            image_data = {
-                'path': result['path'],
-                'modality': modality,
-                'body_part': body_part,
-                'findings': findings
-            }
-            
-            point_id = self.process_with_timeout(
-                self.ingestion.ingest_medical_image,
-                patient_id,
-                image_data,
-                timeout=30
-            )
-            elapsed = time.time() - start_time
-            print(f" ✓ ({elapsed:.1f}s)")
-            print(f"\n✅ Image added successfully: {point_id[:8]}...")
+            print("=" * 70)
             
         except Exception as e:
             print(f"\n❌ Error: {e}")
@@ -376,13 +333,10 @@ class InteractiveCLI:
         try:
             print("\n🔍 Searching...", end='', flush=True)
             start_time = time.time()
-            results = self.process_with_timeout(
-                self.retrieval.query_patient_history,
+            results = self.doc_processor.search_patient_records(
                 patient_id=patient_id,
-                query=query,
-                top_k=10,
-                recent_months=recent_months,
-                timeout=15
+                search_query=query,
+                months_filter=recent_months
             )
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
@@ -395,18 +349,25 @@ class InteractiveCLI:
             print("=" * 70)
             
             for i, result in enumerate(results, 1):
-                print(f"\n{i}. 📊 Relevance: {result['score']:.1%}")
-                print(f"   📅 Date: {result['timestamp'][:10]}")
-                print(f"   📋 Type: {result['report_type']}")
-                print(f"   👨‍⚕️ Doctor: {result['doctor']}")
-                print(f"   🩺 Diagnosis: {result['diagnosis'] or 'N/A'}")
-                if result.get('medications'):
-                    print(f"   💊 Medications: {', '.join(result['medications'])}")
-                print(f"   📝 {result['text'][:150]}...")
+                record_id, record_type, content, doctor_name, record_date, created_at, file_path, extracted_text = result
+                
+                print(f"\n{i}. 📋 {record_type}")
+                print(f"   🆔 Record ID: {record_id}")
+                print(f"   📅 Created: {created_at}")
+                if record_date:
+                    print(f"   📅 Report Date: {record_date}")
+                if doctor_name:
+                    print(f"   👨‍⚕️ Doctor: {doctor_name}")
+                if content:
+                    print(f"   📝 {content[:200]}...")
+                if file_path:
+                    print(f"   📄 File: {Path(file_path).name}")
                 print("-" * 70)
             
         except Exception as e:
             print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def view_timeline(self):
         """View patient timeline"""
@@ -422,12 +383,7 @@ class InteractiveCLI:
         try:
             print("\n🔄 Loading timeline...", end='', flush=True)
             start_time = time.time()
-            timeline = self.process_with_timeout(
-                self.retrieval.get_patient_timeline,
-                patient_id,
-                limit=20,
-                timeout=10
-            )
+            timeline = self.doc_processor.search_patient_records(patient_id)
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
             
@@ -438,17 +394,24 @@ class InteractiveCLI:
             print(f"\n✅ Found {len(timeline)} records (most recent first):")
             print("=" * 70)
             
-            for i, record in enumerate(timeline, 1):
-                print(f"\n{i}. 📅 {record['timestamp'][:10]} - {record['report_type'].upper()}")
-                print(f"   👨‍⚕️ {record['doctor']}")
-                print(f"   🩺 {record['diagnosis'] or 'N/A'}")
-                if record.get('medications'):
-                    print(f"   💊 {', '.join(record['medications'])}")
-                print(f"   📝 {record['text'][:100]}...")
+            for i, result in enumerate(timeline, 1):
+                record_id, record_type, content, doctor_name, record_date, created_at, file_path, extracted_text = result
+                
+                print(f"\n{i}. 📅 {created_at[:10]} - {record_type}")
+                if doctor_name:
+                    print(f"   👨‍⚕️ {doctor_name}")
+                if record_date:
+                    print(f"   📅 Report Date: {record_date}")
+                if content:
+                    print(f"   📝 {content[:150]}...")
+                if file_path:
+                    print(f"   📄 Source: {Path(file_path).name}")
                 print("-" * 70)
             
         except Exception as e:
             print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def ask_question(self):
         """Natural language Q&A"""
@@ -456,9 +419,9 @@ class InteractiveCLI:
         print("❓ ASK A QUESTION")
         print("=" * 70)
         print("\n💡 Examples:")
-        print("   • What medications is the patient taking for diabetes?")
-        print("   • Show recent cardiac evaluations")
-        print("   • When was the last blood pressure reading?")
+        print("   • What medications is the patient taking?")
+        print("   • Show reports from Dr. Smith")
+        print("   • Find diagnosis information")
         
         patient_id = input("\nEnter Patient ID: ").strip()
         if not patient_id:
@@ -471,14 +434,11 @@ class InteractiveCLI:
             return
         
         try:
-            print("\n🤔 Analyzing question...", end='', flush=True)
+            print("\n🤔 Searching for relevant information...", end='', flush=True)
             start_time = time.time()
-            results = self.process_with_timeout(
-                self.retrieval.query_patient_history,
+            results = self.doc_processor.search_patient_records(
                 patient_id=patient_id,
-                query=question,
-                top_k=5,
-                timeout=15
+                search_query=question
             )
             elapsed = time.time() - start_time
             print(f" ✓ ({elapsed:.1f}s)")
@@ -488,30 +448,37 @@ class InteractiveCLI:
                 return
             
             # Show best answer
-            best = results[0]
-            print(f"\n✅ Answer (Confidence: {best['score']:.1%}):")
+            print(f"\n✅ Found {len(results)} relevant record(s):")
             print("=" * 70)
-            print(f"📅 Date: {best['timestamp'][:10]}")
-            print(f"📋 Type: {best['report_type']}")
-            print(f"👨‍⚕️ Doctor: {best['doctor']}")
-            print(f"🩺 Diagnosis: {best['diagnosis'] or 'N/A'}")
-            if best.get('medications'):
-                print(f"💊 Medications: {', '.join(best['medications'])}")
-            print(f"\n📝 Content:\n{best['text']}")
             
-            # Show other relevant results
-            if len(results) > 1:
-                print("\n" + "=" * 70)
-                print("📚 Other Relevant Records:")
-                for i, r in enumerate(results[1:], 2):
-                    print(f"\n{i}. {r['timestamp'][:10]} - {r['report_type']} ({r['score']:.1%})")
-                    print(f"   {r['text'][:80]}...")
+            for i, result in enumerate(results[:3], 1):  # Show top 3
+                record_id, record_type, content, doctor_name, record_date, created_at, file_path, extracted_text = result
+                
+                print(f"\n{i}. 📋 {record_type}")
+                print(f"   📅 Date: {created_at[:10]}")
+                if doctor_name:
+                    print(f"   👨‍⚕️ Doctor: {doctor_name}")
+                if record_date:
+                    print(f"   📅 Report Date: {record_date}")
+                
+                # Show content or extracted text
+                display_text = extracted_text if extracted_text else content
+                if display_text:
+                    print(f"\n   📝 Content:")
+                    print(f"   {display_text[:400]}...")
+                
+                print("-" * 70)
+            
+            if len(results) > 3:
+                print(f"\n... and {len(results) - 3} more record(s)")
             
         except Exception as e:
             print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def batch_upload(self):
-        """Batch upload folder with parallel processing"""
+        """Batch upload folder"""
         print("\n" + "=" * 70)
         print("📁 BATCH UPLOAD")
         print("=" * 70)
@@ -527,111 +494,39 @@ class InteractiveCLI:
             print("❌ Invalid folder!")
             return
         
-        folder = Path(folder_path)
-        
-        # Find all files
-        files = []
-        for ext in self.doc_processor.supported_text_formats + self.doc_processor.supported_image_formats:
-            files.extend(folder.glob(f"*{ext}"))
-        
-        if not files:
-            print("❌ No supported files found!")
-            return
-        
-        print(f"\n📂 Found {len(files)} files:")
-        for i, f in enumerate(files[:10], 1):
-            print(f"   {i}. {f.name}")
-        if len(files) > 10:
-            print(f"   ... and {len(files) - 10} more")
-        
-        print(f"\nProcess all {len(files)} files? (y/n): ", end='')
-        if input().strip().lower() != 'y':
-            print("❌ Cancelled")
-            return
-        
-        # Process with progress tracking
-        success = 0
-        errors = 0
-        skipped = 0
-        
-        print("\n" + "=" * 70)
-        print("Processing files...")
-        print("=" * 70)
-        
-        for idx, file_path in enumerate(files, 1):
-            try:
-                print(f"\n[{idx}/{len(files)}] 📄 {file_path.name}...", end=' ', flush=True)
-                start_time = time.time()
+        try:
+            print(f"\n📂 Scanning folder...", end='', flush=True)
+            result = self.doc_processor.batch_upload_folder(patient_id, folder_path)
+            
+            if not result['success']:
+                print(f"\n❌ Error: {result['error']}")
+                return
+            
+            print(f" ✓")
+            print("\n" + "=" * 70)
+            print("✅ Batch upload complete!")
+            print("=" * 70)
+            print(f"📊 Total files: {result['total_files']}")
+            print(f"✅ Successful: {result['successful']}")
+            print(f"❌ Failed: {result['failed']}")
+            print("\n📋 Details:")
+            
+            for item in result['results']:
+                filename = item['filename']
+                item_result = item['result']
                 
-                # Check file size
-                file_size = os.path.getsize(file_path) / (1024 * 1024)
-                if file_size > 50:
-                    print(f"⊘ Skipped (too large: {file_size:.1f}MB)")
-                    skipped += 1
-                    continue
-                
-                # Process with timeout
-                timeout = max(30, int(file_size * 5))
-                result = self.process_with_timeout(
-                    self.doc_processor.process_file,
-                    file_path,
-                    timeout=timeout
-                )
-                
-                if result['type'] == 'text':
-                    # Quick metadata extraction on partial text
-                    text_sample = result['text'][:3000]
-                    try:
-                        metadata = self.process_with_timeout(
-                            self.doc_processor.extract_medical_metadata,
-                            text_sample,
-                            timeout=5
-                        )
-                    except:
-                        metadata = {
-                            'report_type': 'general',
-                            'doctor': 'Unknown',
-                            'diagnosis': None,
-                            'medications': []
-                        }
-                    
-                    report_data = {'text': result['text'], **metadata}
-                    self.process_with_timeout(
-                        self.ingestion.ingest_patient_report,
-                        patient_id,
-                        report_data,
-                        timeout=15
-                    )
-                    
-                elif result['type'] == 'image':
-                    image_data = {
-                        'path': result['path'],
-                        'modality': 'Unknown',
-                        'body_part': 'Unknown',
-                        'findings': ''
-                    }
-                    self.process_with_timeout(
-                        self.ingestion.ingest_medical_image,
-                        patient_id,
-                        image_data,
-                        timeout=20
-                    )
-                
-                elapsed = time.time() - start_time
-                print(f"✓ ({elapsed:.1f}s)")
-                success += 1
-                
-            except Exception as e:
-                error_msg = str(e)[:50]
-                print(f"✗ ({error_msg})")
-                errors += 1
-        
-        print("\n" + "=" * 70)
-        print(f"✅ Batch complete!")
-        print(f"   Success: {success}")
-        print(f"   Errors: {errors}")
-        print(f"   Skipped: {skipped}")
-        print("=" * 70)
+                if item_result.get('success'):
+                    print(f"   ✅ {filename} - ID: {item_result['document_id']}")
+                else:
+                    error = item_result.get('error', 'Unknown error')[:50]
+                    print(f"   ❌ {filename} - {error}")
+            
+            print("=" * 70)
+            
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def run(self):
         """Main loop"""
