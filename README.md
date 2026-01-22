@@ -52,6 +52,10 @@ Inside .env :
 QDRANT_URL=<your Qdrant URL>
 QDRANT_API_KEY=<your created API key>
 
+NOTE:- Initial run may take some time to install and load some more dependencies.
+Then upload demo medical record folder file using batch folder upload option of interactive_CLI
+After that you can check patient history, timeline and other query using the CLI.
+
 📊 Agent Logic Overview
 1. Ingestion: The DocumentProcessor parses raw files into structured text or image paths.
 2. Vectorization: The EmbeddingGenerator creates 768-dimensional text vectors or 512-dimensional image vectors.
